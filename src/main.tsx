@@ -278,6 +278,7 @@ if ("external" !== 'ant' && isBeingDebugged()) {
  */
 function logSessionTelemetry(): void {
   const model = parseUserSpecifiedModel(getInitialMainLoopModel() ?? getDefaultMainLoopModel());
+  console.log("...............")
   void logSkillsLoaded(getCwd(), getContextWindowForModel(model, getSdkBetas()));
   void loadAllPluginsCacheOnly().then(({
     enabled,

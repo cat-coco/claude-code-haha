@@ -1,19 +1,10 @@
-export type SyntaxTheme = {
-  name: string;
-};
-
-export class ColorDiff {
-  format(input: string): string {
-    return input;
-  }
-}
-
-export class ColorFile {
-  format(input: string): string {
-    return input;
-  }
-}
-
-export function getSyntaxTheme(themeName: string): SyntaxTheme {
-  return { name: themeName };
-}
+// Re-export the pure-TypeScript port so `import ... from 'color-diff-napi'`
+// resolves to a working implementation at runtime (bun uses tsconfig paths).
+export {
+  ColorDiff,
+  ColorFile,
+  getSyntaxTheme,
+  type Hunk,
+  type SyntaxTheme,
+  type NativeModule,
+} from '../src/native-ts/color-diff/index.js'
