@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.claudecode.blog.mapper.ArticleMapper">
+
+    <!-- 文章详情结果映射 -->
+    <resultMap id="ArticleDTOMap" type="com.claudecode.blog.dto.ArticleDTO">
+        <id property="id" column="id"/>
+        <result property="title" column="title"/>
+        <result property="slug" column="slug"/>
+        <result property="summary" column="summary"/>
+        <result property="content" column="content"/>
+        <result property="coverImage" column="cover_image"/>
+        <result property="categoryId" column="category_id"/>
+        <result property="categoryName" column="category_name"/>
+        <result property="author" column="author"/>
+        <result property="sourceFile" column="source_file"/>
+        <result property="difficulty" column="difficulty"/>
+        <result property="isTop" column="is_top"/>
+        <result property="isRecommended" column="is_recommended"/>
+        <result property="status" column="status"/>
+        <result property="viewCount" column="view_count"/>
+        <result property="likeCount" column="like_count"/>
+        <result property="commentCount" column="comment_count"/>
+        <result property="wordCount" column="word_count"/>
+        <result property="readTime" column="read_time"/>
+        <result property="sortOrder" column="sort_order"/>
+        <result property="publishedAt" column="published_at"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- 查询文章列表（带分类名） -->
+    <select id="selectArticleList" resultMap="ArticleDTOMap">
+        SELECT a.*, c.name AS category_name
+        FROM blog_article a
+        LEFT JOIN blog_category c ON a.category_id = c.id
+        WHERE a.deleted = 0
+        <if test="categoryId != null">
+            AND a.category_id = #{categoryId}
+        </if>
+        <if test="keyword != null and keyword != ''">
+            AND (a.title LIKE CONCAT('%', #{keyword}, '%') OR a.summary LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="status != null">
+            AND a.status = #{status}
+        </if>
+        ORDER BY a.is_top DESC, a.sort_order ASC, a.published_at DESC
+    </select>
+
+    <!-- 按浏览量统计 Top N 文章 -->
+    <select id="selectTopArticles" resultMap="ArticleDTOMap">
+        SELECT a.id, a.title, a.slug, a.view_count, a.cover_image, c.name AS category_name
+        FROM blog_article a
+        LEFT JOIN blog_category c ON a.category_id = c.id
+        WHERE a.deleted = 0 AND a.status = 1
+        ORDER BY a.view_count DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 访问统计：按设备类型分组 -->
+    <select id="countByDeviceType" resultType="java.util.Map">
+        SELECT device_type AS name, COUNT(*) AS value
+        FROM sys_visit_log
+        WHERE created_at >= #{startDate}
+        GROUP BY device_type
+        ORDER BY value DESC
+    </select>
+
+    <!-- 访问统计：按浏览器分组 -->
+    <select id="countByBrowser" resultType="java.util.Map">
+        SELECT browser AS name, COUNT(*) AS value
+        FROM sys_visit_log
+        WHERE created_at >= #{startDate}
+        GROUP BY browser
+        ORDER BY value DESC
+        LIMIT 10
+    </select>
+
+</mapper>
