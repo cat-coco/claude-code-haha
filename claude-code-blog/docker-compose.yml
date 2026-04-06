@@ -12,7 +12,7 @@ services:
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
@@ -31,7 +31,7 @@ services:
     container_name: cc-blog-redis
     restart: always
     ports:
-      - "6379:6379"
+      - "63790:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -60,7 +60,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-claudeCodeBlog2024SecretKeyForJwtTokenGenerationAndValidation}
       UPLOAD_PATH: /data/uploads
     ports:
-      - "8080:8080"
+      - "8088:8088"
     volumes:
       - upload_data:/data/uploads
     depends_on:

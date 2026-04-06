@@ -15,13 +15,15 @@ public class AdminTagController {
 
     @PostMapping("/save")
     public Result<?> save(@RequestBody Tag tag) {
-        return Result.success(tagService.save(tag));
+        tagService.save(tag);
+        return Result.success();
     }
 
     @PutMapping("/update/{id}")
     public Result<?> update(@PathVariable Long id, @RequestBody Tag tag) {
         tag.setId(id);
-        return Result.success(tagService.update(tag));
+        tagService.update(tag);
+        return Result.success();
     }
 
     @DeleteMapping("/delete/{id}")

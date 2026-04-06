@@ -3,6 +3,7 @@ package com.claudecode.blog.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.claudecode.blog.dto.PageResult;
 import com.claudecode.blog.entity.Article;
 import com.claudecode.blog.entity.Comment;
 import com.claudecode.blog.mapper.ArticleMapper;
@@ -18,6 +19,24 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentMapper commentMapper;
     private final ArticleMapper articleMapper;
+
+    @Override
+    public PageResult<Comment> listByArticleId(Long articleId, int page, int pageSize) {
+        Page<Comment> result = listByArticle(articleId, page, pageSize);
+        return new PageResult<>(result.getRecords(), result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
+    public PageResult<Comment> listAll(int page, int pageSize, Integer status) {
+        Page<Comment> pageParam = new Page<>(page, pageSize);
+        QueryWrapper<Comment> queryWrapper = new QueryWrapper<>();
+        if (status != null) {
+            queryWrapper.eq("status", status);
+        }
+        queryWrapper.orderByDesc("created_at");
+        Page<Comment> result = commentMapper.selectPage(pageParam, queryWrapper);
+        return new PageResult<>(result.getRecords(), result.getTotal(), result.getCurrent(), result.getSize());
+    }
 
     @Override
     public Page<Comment> listByArticle(Long articleId, int page, int pageSize) {

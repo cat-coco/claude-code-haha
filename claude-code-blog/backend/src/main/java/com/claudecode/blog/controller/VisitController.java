@@ -2,7 +2,7 @@ package com.claudecode.blog.controller;
 
 import com.claudecode.blog.dto.Result;
 import com.claudecode.blog.entity.VisitLog;
-import com.claudecode.blog.service.VisitService;
+import com.claudecode.blog.service.VisitLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class VisitController {
 
-    private final VisitService visitService;
+    private final VisitLogService visitLogService;
 
     @PostMapping("/log")
     public Result<?> log(@RequestBody VisitLog visitLog) {
-        visitService.saveVisitLog(visitLog);
+        visitLogService.saveLog(visitLog);
         return Result.success();
     }
 }

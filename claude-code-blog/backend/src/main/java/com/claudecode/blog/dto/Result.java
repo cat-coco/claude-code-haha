@@ -30,6 +30,14 @@ public class Result<T> {
         return new Result<>(200, message, data);
     }
 
+    public static <T> Result<T> success() {
+        return ok();
+    }
+
+    public static <T> Result<T> success(T data) {
+        return ok(data);
+    }
+
     public static <T> Result<T> fail(String message) {
         return new Result<>(500, message, null);
     }

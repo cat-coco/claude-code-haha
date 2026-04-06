@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.claudecode.blog.dto.ArticleDTO;
 import com.claudecode.blog.dto.ArticleSaveDTO;
+import com.claudecode.blog.dto.PageResult;
 import com.claudecode.blog.entity.Article;
 import com.claudecode.blog.entity.ArticleTag;
 import com.claudecode.blog.entity.Category;
@@ -242,6 +243,112 @@ public class ArticleServiceImpl implements ArticleService {
         if (dto.getIsRecommended() != null) {
             article.setIsRecommended(dto.getIsRecommended() ? 1 : 0);
         }
+    }
+
+    @Override
+    public PageResult<ArticleDTO> listArticles(int page, int pageSize, Long categoryId, String keyword) {
+        Page<Article> result = page(page, pageSize, categoryId, keyword, 1);
+        List<ArticleDTO> dtoList = result.getRecords().stream().map(this::toDTO).collect(Collectors.toList());
+        return new PageResult<>(dtoList, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
+    public ArticleDTO getArticleById(Long id) {
+        return toDTO(getById(id));
+    }
+
+    @Override
+    public ArticleDTO getArticleBySlug(String slug) {
+        return toDTO(getBySlug(slug));
+    }
+
+    @Override
+    public PageResult<ArticleDTO> listAdminArticles(int page, int pageSize, Long categoryId, String keyword, Integer status) {
+        Page<Article> result = page(page, pageSize, categoryId, keyword, status);
+        List<ArticleDTO> dtoList = result.getRecords().stream().map(this::toDTO).collect(Collectors.toList());
+        return new PageResult<>(dtoList, result.getTotal(), result.getCurrent(), result.getSize());
+    }
+
+    @Override
+    @Transactional
+    public ArticleDTO saveArticle(ArticleSaveDTO dto) {
+        save(dto);
+        return null;
+    }
+
+    @Override
+    @Transactional
+    public ArticleDTO updateArticle(ArticleSaveDTO dto) {
+        update(dto.getId(), dto);
+        return toDTO(getById(dto.getId()));
+    }
+
+    @Override
+    @Transactional
+    public void deleteArticle(Long id) {
+        delete(id);
+    }
+
+    @Override
+    public void toggleTop(Long id) {
+        Article article = articleMapper.selectById(id);
+        if (article != null) {
+            article.setIsTop(article.getIsTop() == null || article.getIsTop() == 0 ? 1 : 0);
+            articleMapper.updateById(article);
+        }
+    }
+
+    @Override
+    public void toggleRecommended(Long id) {
+        Article article = articleMapper.selectById(id);
+        if (article != null) {
+            article.setIsRecommended(article.getIsRecommended() == null || article.getIsRecommended() == 0 ? 1 : 0);
+            articleMapper.updateById(article);
+        }
+    }
+
+    private ArticleDTO toDTO(Article article) {
+        if (article == null) return null;
+        ArticleDTO dto = new ArticleDTO();
+        dto.setId(article.getId());
+        dto.setTitle(article.getTitle());
+        dto.setSlug(article.getSlug());
+        dto.setSummary(article.getSummary());
+        dto.setContent(article.getContent());
+        dto.setContentHtml(article.getContentHtml());
+        dto.setCoverImage(article.getCoverImage());
+        dto.setCategoryId(article.getCategoryId());
+        dto.setAuthor(article.getAuthor());
+        dto.setSourceFile(article.getSourceFile());
+        dto.setDifficulty(article.getDifficulty() != null ? String.valueOf(article.getDifficulty()) : null);
+        dto.setIsTop(article.getIsTop() != null && article.getIsTop() == 1);
+        dto.setIsRecommended(article.getIsRecommended() != null && article.getIsRecommended() == 1);
+        dto.setStatus(article.getStatus());
+        dto.setViewCount(article.getViewCount() != null ? article.getViewCount().intValue() : 0);
+        dto.setLikeCount(article.getLikeCount() != null ? article.getLikeCount().intValue() : 0);
+        dto.setCommentCount(article.getCommentCount());
+        dto.setWordCount(article.getWordCount());
+        dto.setReadTime(article.getReadTime());
+        dto.setSortOrder(article.getSortOrder());
+        dto.setPublishedAt(article.getPublishedAt());
+        dto.setCreatedAt(article.getCreatedAt());
+        dto.setUpdatedAt(article.getUpdatedAt());
+        // Populate category name
+        if (article.getCategoryId() != null) {
+            Category category = categoryMapper.selectById(article.getCategoryId());
+            if (category != null) {
+                dto.setCategoryName(category.getName());
+            }
+        }
+        // Populate tags
+        QueryWrapper<ArticleTag> atQuery = new QueryWrapper<>();
+        atQuery.eq("article_id", article.getId());
+        List<ArticleTag> articleTags = articleTagMapper.selectList(atQuery);
+        if (!articleTags.isEmpty()) {
+            List<Long> tagIds = articleTags.stream().map(ArticleTag::getTagId).collect(Collectors.toList());
+            dto.setTagList(tagMapper.selectBatchIds(tagIds));
+        }
+        return dto;
     }
 
     private void updateCategoryArticleCount(Long categoryId, int delta) {

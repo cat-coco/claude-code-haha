@@ -15,13 +15,15 @@ public class AdminCategoryController {
 
     @PostMapping("/save")
     public Result<?> save(@RequestBody Category category) {
-        return Result.success(categoryService.save(category));
+        categoryService.save(category);
+        return Result.success();
     }
 
     @PutMapping("/update/{id}")
     public Result<?> update(@PathVariable Long id, @RequestBody Category category) {
         category.setId(id);
-        return Result.success(categoryService.update(category));
+        categoryService.update(category);
+        return Result.success();
     }
 
     @DeleteMapping("/delete/{id}")

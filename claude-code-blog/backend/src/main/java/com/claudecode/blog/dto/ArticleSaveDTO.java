@@ -7,6 +7,7 @@ import java.util.List;
 @Data
 public class ArticleSaveDTO {
 
+    private Long id;
     private String title;
     private String slug;
     private String summary;

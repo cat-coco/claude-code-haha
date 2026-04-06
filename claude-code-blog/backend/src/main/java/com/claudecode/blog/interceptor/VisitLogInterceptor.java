@@ -44,16 +44,16 @@ public class VisitLogInterceptor implements HandlerInterceptor {
             }
 
             VisitLog visitLog = new VisitLog();
-            visitLog.setIp(ip);
-            visitLog.setUserAgent(userAgent);
-            visitLog.setReferer(referer);
+            visitLog.setVisitorIp(ip);
+            visitLog.setVisitorUa(userAgent);
+            visitLog.setVisitorReferer(referer);
             visitLog.setPageUrl(pageUrl);
             visitLog.setSessionId(sessionId);
             visitLog.setArticleId(articleId);
             visitLog.setBrowser(deviceInfo.get("browser"));
             visitLog.setOs(deviceInfo.get("os"));
             visitLog.setDeviceType(deviceInfo.get("deviceType"));
-            visitLog.setVisitTime(LocalDateTime.now());
+            visitLog.setCreatedAt(LocalDateTime.now());
 
             visitLogMapper.insert(visitLog);
         } catch (Exception e) {
