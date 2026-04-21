@@ -58,6 +58,7 @@ import {
   hasUltraplanKeyword,
   replaceUltraplanKeyword,
 } from '../ultraplan/keyword.js'
+import { efmDebugLog } from '../efmDebugLog.js'
 import { processTextPrompt } from './processTextPrompt.js'
 export type ProcessUserInputContext = ToolUseContext & LocalJSXCommandContext
 
@@ -139,6 +140,18 @@ export async function processUserInput({
   skipAttachments?: boolean
 }): Promise<ProcessUserInputBaseResult> {
   const inputString = typeof input === 'string' ? input : null
+  efmDebugLog('user_input.received', {
+    mode,
+    uuid,
+    isMeta,
+    querySource,
+    skipSlashCommands,
+    inputType: typeof input === 'string' ? 'string' : 'blocks',
+    inputLength:
+      typeof input === 'string' ? input.length : (input as unknown[]).length,
+    input,
+    preExpansionInput,
+  })
   // Immediately show the user input prompt while we are still processing the input.
   // Skip for isMeta (system-generated prompts like scheduled tasks) — those
   // should run invisibly.

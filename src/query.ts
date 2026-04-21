@@ -43,6 +43,7 @@ import {
   isPromptTooLongMessage,
 } from './services/api/errors.js'
 import { logAntError, logForDebugging } from './utils/debug.js'
+import { efmDebugLog, efmDebugLogLazy } from './utils/efmDebugLog.js'
 import {
   createUserMessage,
   createUserInterruptionMessage,
@@ -227,7 +228,16 @@ export async function* query(
   Terminal
 > {
   const consumedCommandUuids: string[] = []
+  efmDebugLog('query.start', {
+    querySource: params.querySource,
+    messageCount: params.messages.length,
+    maxTurns: params.maxTurns,
+  })
   const terminal = yield* queryLoop(params, consumedCommandUuids)
+  efmDebugLog('query.end', {
+    reason: terminal?.reason,
+    querySource: params.querySource,
+  })
   // Only reached if queryLoop returned normally. Skipped on throw (error
   // propagates through yield*) and on .return() (Return completion closes
   // both generators). This gives the same asymmetric started-without-completed
@@ -335,6 +345,13 @@ async function* queryLoop(
     )
 
     yield { type: 'stream_request_start' }
+
+    efmDebugLog('query.turn_start', {
+      turnCount,
+      querySource,
+      messageCount: messages.length,
+      lastMessageType: messages[messages.length - 1]?.type,
+    })
 
     queryCheckpoint('query_fn_entry')
 
@@ -656,8 +673,45 @@ async function* queryLoop(
         try {
           let streamingFallbackOccured = false
           queryCheckpoint('query_api_streaming_start')
+          const efmRequestMessages = prependUserContext(
+            messagesForQuery,
+            userContext,
+          )
+          efmDebugLogLazy('api.request', () => ({
+            model: currentModel,
+            fallbackModel,
+            querySource,
+            turnCount,
+            queryChainId: queryTracking.chainId,
+            queryDepth: queryTracking.depth,
+            messageCount: efmRequestMessages.length,
+            toolCount: toolUseContext.options.tools.length,
+            toolNames: toolUseContext.options.tools.map(t => t.name),
+            thinkingConfig: toolUseContext.options.thinkingConfig,
+            systemPromptSummary: {
+              parts:
+                typeof fullSystemPrompt === 'object' &&
+                Array.isArray(
+                  (fullSystemPrompt as { parts?: unknown[] }).parts,
+                )
+                  ? (
+                      fullSystemPrompt as { parts: Array<{ text?: string }> }
+                    ).parts.map(p => p.text?.slice(0, 200) ?? '')
+                  : undefined,
+            },
+            userContextKeys: Object.keys(userContext),
+            systemContextKeys: Object.keys(systemContext),
+            messages: efmRequestMessages.map(m => ({
+              type: m.type,
+              uuid: (m as { uuid?: string }).uuid,
+              content:
+                m.type === 'user' || m.type === 'assistant'
+                  ? (m as { message?: { content?: unknown } }).message?.content
+                  : undefined,
+            })),
+          }))
           for await (const message of deps.callModel({
-            messages: prependUserContext(messagesForQuery, userContext),
+            messages: efmRequestMessages,
             systemPrompt: fullSystemPrompt,
             thinkingConfig: toolUseContext.options.thinkingConfig,
             tools: toolUseContext.options.tools,
@@ -829,6 +883,24 @@ async function* queryLoop(
               const msgToolUseBlocks = message.message.content.filter(
                 content => content.type === 'tool_use',
               ) as ToolUseBlock[]
+              efmDebugLog('api.assistant_message', {
+                turnCount,
+                uuid: (message as { uuid?: string }).uuid,
+                apiError: (message as { apiError?: string }).apiError,
+                stopReason: message.message.stop_reason,
+                contentBlockTypes: message.message.content.map(c => c.type),
+                toolUseCount: msgToolUseBlocks.length,
+                toolUses: msgToolUseBlocks.map(t => ({
+                  id: t.id,
+                  name: t.name,
+                  input: t.input,
+                })),
+                textPreview: message.message.content
+                  .filter(c => c.type === 'text')
+                  .map(c => (c as { text: string }).text.slice(0, 500))
+                  .join('\n---\n'),
+                usage: message.message.usage,
+              })
               if (msgToolUseBlocks.length > 0) {
                 toolUseBlocks.push(...msgToolUseBlocks)
                 needsFollowUp = true

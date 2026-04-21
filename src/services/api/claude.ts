@@ -165,6 +165,7 @@ import { CLAUDE_IN_CHROME_MCP_SERVER_NAME } from 'src/utils/claudeInChrome/commo
 import { CHROME_TOOL_SEARCH_INSTRUCTIONS } from 'src/utils/claudeInChrome/prompt.js'
 import { getMaxThinkingTokensForModel } from 'src/utils/context.js'
 import { logForDebugging } from 'src/utils/debug.js'
+import { efmDebugLog, efmDebugLogLazy } from 'src/utils/efmDebugLog.js'
 import { logForDiagnosticsNoPII } from 'src/utils/diagLogs.js'
 import { type EffortValue, modelSupportsEffort } from 'src/utils/effort.js'
 import {
@@ -1797,6 +1798,30 @@ async function* queryModel(
         const params = paramsFromContext(context)
         captureAPIRequest(params, options.querySource) // Capture for bug reports
 
+        efmDebugLogLazy('api.sdk_request_dispatch', () => ({
+          attempt,
+          model: params.model,
+          fastMode: context.fastMode,
+          max_tokens: params.max_tokens,
+          messageCount: Array.isArray(params.messages)
+            ? params.messages.length
+            : undefined,
+          toolNames: Array.isArray(params.tools)
+            ? (params.tools as Array<{ name?: string }>).map(t => t.name)
+            : undefined,
+          systemLen: Array.isArray(params.system)
+            ? (params.system as Array<{ text?: string }>).reduce(
+                (acc, p) => acc + (p.text?.length ?? 0),
+                0,
+              )
+            : typeof params.system === 'string'
+              ? (params.system as string).length
+              : 0,
+          thinking: (params as { thinking?: unknown }).thinking,
+          betas: (params as { betas?: unknown }).betas,
+          params,
+        }))
+
         maxOutputTokens = params.max_tokens
 
         // Fire immediately before the fetch is dispatched. .withResponse() below
@@ -1968,12 +1993,30 @@ async function* queryModel(
 
         if (isFirstChunk) {
           logForDebugging('Stream started - received first chunk')
+          efmDebugLog('api.stream_first_chunk', {
+            model: options.model,
+            requestId: streamRequestId,
+            ttfbMs: Date.now() - start,
+          })
           queryCheckpoint('query_first_chunk_received')
           if (!options.agentId) {
             headlessProfilerCheckpoint('first_chunk')
           }
           endQueryProfile()
           isFirstChunk = false
+        }
+
+        if (part.type === 'message_start' || part.type === 'message_stop') {
+          efmDebugLog(`api.stream_${part.type}`, {
+            model: options.model,
+            requestId: streamRequestId,
+            event: part,
+          })
+        } else if (part.type === 'content_block_start') {
+          efmDebugLog('api.stream_content_block_start', {
+            index: part.index,
+            block: part.content_block,
+          })
         }
 
         switch (part.type) {

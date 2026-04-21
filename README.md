@@ -1,4 +1,4 @@
-# Claude Code Haha
+# EFM claude code
 
 基于 Claude Code 泄露源码修复的**本地可运行版本**，支持接入任意 Anthropic 兼容 API（如 MiniMax、OpenRouter 等）。
 
@@ -111,6 +111,33 @@ echo "explain this code" | ./bin/claude-haha -p
 | `API_TIMEOUT_MS` | 否 | API 请求超时，默认 600000 (10min) |
 | `DISABLE_TELEMETRY` | 否 | 设为 `1` 禁用遥测 |
 | `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` | 否 | 设为 `1` 禁用非必要网络请求 |
+| `EFM_DEBUG_LOG` | 否 | 设为 `1` 启用交互调试日志，写入 `./debugLog.log` |
+| `EFM_DEBUG_LOG_PATH` | 否 | 覆盖调试日志文件路径 |
+
+---
+
+## EFM 调试日志
+
+开启 `EFM_DEBUG_LOG=1` 后，一次完整 LLM 交互的关键节点会被顺序写入项目根目录的
+`debugLog.log`。可以用 `tail -f debugLog.log` 实时查看出入参数。
+
+覆盖的关键节点：
+
+| 事件 Tag | 节点 |
+|----------|------|
+| `user_input.received` | 用户输入进入处理流水线 |
+| `query.start` / `query.end` | 一次 query 的开始与终止（含 reason） |
+| `query.turn_start` | 每一轮 agent loop 起点 |
+| `api.request` | 组装完 messages/tools/system prompt 即将下发到 `deps.callModel` |
+| `api.sdk_request_dispatch` | 即将真正发往 `anthropic.beta.messages.create` |
+| `api.stream_first_chunk` | 收到第一个流式 chunk（含 TTFB） |
+| `api.stream_message_start` / `api.stream_message_stop` | 模型消息边界 |
+| `api.stream_content_block_start` | 每个 content block 开始（text / tool_use / thinking） |
+| `api.assistant_message` | 组装完整的 assistant 消息（含 tool_use 列表与 usage） |
+| `tool.invoke_start` | 模型命中某个工具，进入 runToolUse |
+| `tool.call_start` / `tool.call_end` | 工具实际执行前后（含耗时与结果摘要） |
+
+关闭开关（默认即关闭）时该模块完全 no-op，不会创建文件、不会序列化任何参数。
 
 ---
 
