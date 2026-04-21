@@ -50,21 +50,57 @@ function ensureHeader(path: string): void {
   try {
     const header = `===== EFM debug log session @ ${new Date().toISOString()} pid=${process.pid} =====\n`
     if (!existsSync(path)) {
-      writeFileSync(path, header)
+      writeFileSync(path, header, { encoding: 'utf8' })
     } else {
-      appendFileSync(path, header)
+      appendFileSync(path, header, { encoding: 'utf8' })
     }
   } catch {
     // If writing fails we don't want to crash the host process.
   }
 }
 
+// Decodes JSON `\uXXXX` escapes (including surrogate pairs) back to literal
+// characters so CJK and other non-ASCII content is readable in the log.
+//
+// Backslash-counting is significant: in JSON output `\uXXXX` (1 backslash)
+// is the real Unicode escape, while `\\uXXXX` (2 backslashes) is a literal
+// `\u` that happened to appear in the source string. Only an odd number
+// of leading backslashes means the `u` is escaped and should be decoded —
+// the last backslash is consumed, the rest remain literal.
+//
+// Control chars (< U+0020, except tab) are left escaped so a raw CR/LF or
+// bell byte can't corrupt `tail -f` output.
+function unescapeUnicodeForDisplay(s: string): string {
+  // Collapse surrogate pairs first so emoji/non-BMP round-trip correctly.
+  s = s.replace(
+    /(\\+)u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})/g,
+    (match, slashes: string, hi: string, lo: string) => {
+      if (slashes.length % 2 !== 1) return match
+      const cp =
+        (parseInt(hi, 16) - 0xd800) * 0x400 +
+        (parseInt(lo, 16) - 0xdc00) +
+        0x10000
+      return slashes.slice(0, -1) + String.fromCodePoint(cp)
+    },
+  )
+  return s.replace(
+    /(\\+)u([0-9a-fA-F]{4})/g,
+    (match, slashes: string, hex: string) => {
+      if (slashes.length % 2 !== 1) return match
+      const code = parseInt(hex, 16)
+      if (code < 0x20 && code !== 0x09) return match
+      return slashes.slice(0, -1) + String.fromCharCode(code)
+    },
+  )
+}
+
 function safeStringify(value: unknown): string {
   if (value === undefined) return ''
   if (typeof value === 'string') return value
+  let out: string
   try {
     const seen = new WeakSet<object>()
-    return JSON.stringify(
+    out = JSON.stringify(
       value,
       (_k, v) => {
         if (typeof v === 'bigint') return `${v.toString()}n`
@@ -87,6 +123,7 @@ function safeStringify(value: unknown): string {
       return '[unserializable]'
     }
   }
+  return out === undefined ? '' : unescapeUnicodeForDisplay(out)
 }
 
 /**
@@ -101,7 +138,7 @@ export function efmDebugLog(tag: string, data?: unknown): void {
   const payload = data === undefined ? '' : ` ${safeStringify(data)}`
   const line = `[${ts}] ${tag}${payload}\n`
   try {
-    appendFileSync(path, line)
+    appendFileSync(path, line, { encoding: 'utf8' })
   } catch {
     // swallow — logging must never break the host flow
   }
