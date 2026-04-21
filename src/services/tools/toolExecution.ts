@@ -60,6 +60,7 @@ import type {
 import { count } from '../../utils/array.js'
 import { createAttachmentMessage } from '../../utils/attachments.js'
 import { logForDebugging } from '../../utils/debug.js'
+import { efmDebugLog } from '../../utils/efmDebugLog.js'
 import {
   AbortError,
   errorMessage,
@@ -341,6 +342,14 @@ export async function* runToolUse(
   toolUseContext: ToolUseContext,
 ): AsyncGenerator<MessageUpdateLazy, void> {
   const toolName = toolUse.name
+  efmDebugLog('tool.invoke_start', {
+    toolName,
+    toolUseId: toolUse.id,
+    input: toolUse.input,
+    assistantMessageUuid: assistantMessage.uuid,
+    queryChainId: toolUseContext.queryTracking?.chainId,
+    queryDepth: toolUseContext.queryTracking?.depth,
+  })
   // First try to find in the available tools (what the model sees)
   let tool = findToolByName(toolUseContext.options.tools, toolName)
 
@@ -1203,6 +1212,11 @@ async function checkPermissionsAndCallTool(
   } else if (processedInput !== backfilledClone) {
     callInput = processedInput
   }
+  efmDebugLog('tool.call_start', {
+    toolName: tool.name,
+    toolUseId: toolUseID,
+    input: callInput,
+  })
   try {
     const result = await tool.call(
       callInput,
@@ -1222,6 +1236,20 @@ async function checkPermissionsAndCallTool(
     )
     const durationMs = Date.now() - startTime
     addToToolDuration(durationMs)
+    efmDebugLog('tool.call_end', {
+      toolName: tool.name,
+      toolUseId: toolUseID,
+      durationMs,
+      hasData: !!(result as { data?: unknown }).data,
+      resultPreview: (() => {
+        try {
+          const s = JSON.stringify((result as { data?: unknown }).data)
+          return s && s.length > 2000 ? `${s.slice(0, 2000)}…[truncated]` : s
+        } catch {
+          return '[unserializable]'
+        }
+      })(),
+    })
 
     // Log tool content/output as span event if enabled
     if (result.data && typeof result.data === 'object') {
