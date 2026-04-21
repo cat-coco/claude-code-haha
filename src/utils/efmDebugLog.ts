@@ -94,6 +94,33 @@ function unescapeUnicodeForDisplay(s: string): string {
   )
 }
 
+const utf8Decoder = new TextDecoder('utf-8', { fatal: true })
+
+// Decode a byte sequence as UTF-8. Returns null if the bytes aren't valid
+// UTF-8 (so callers can fall through to a binary summary instead of
+// producing mojibake).
+function bytesToUtf8OrNull(bytes: Uint8Array): string | null {
+  try {
+    return utf8Decoder.decode(bytes)
+  } catch {
+    return null
+  }
+}
+
+function summarizeBinary(len: number): string {
+  return `<binary ${len} bytes>`
+}
+
+// Detect the serialized-Buffer shape `{type:"Buffer", data:[...]}` that
+// appears after a Buffer has been through JSON.parse(JSON.stringify(buf)).
+function asSerializedBuffer(v: unknown): number[] | null {
+  if (!v || typeof v !== 'object') return null
+  const obj = v as { type?: unknown; data?: unknown }
+  if (obj.type !== 'Buffer' || !Array.isArray(obj.data)) return null
+  if (!obj.data.every(n => typeof n === 'number')) return null
+  return obj.data as number[]
+}
+
 function safeStringify(value: unknown): string {
   if (value === undefined) return ''
   if (typeof value === 'string') return value
@@ -107,6 +134,36 @@ function safeStringify(value: unknown): string {
         if (typeof v === 'function') return `[Function ${v.name || 'anon'}]`
         if (v instanceof Error) {
           return { name: v.name, message: v.message, stack: v.stack }
+        }
+        // Buffer / Uint8Array / other TypedArrays / ArrayBuffer: JSON.stringify
+        // default is to dump numeric byte values, which turns CJK into
+        // [228,189,160,...]. Try decoding as UTF-8 so 你好 round-trips; fall
+        // back to a compact `<binary N bytes>` marker when it isn't text.
+        if (v instanceof Uint8Array) {
+          const str = bytesToUtf8OrNull(v)
+          return str ?? summarizeBinary(v.byteLength)
+        }
+        if (v instanceof ArrayBuffer) {
+          const u8 = new Uint8Array(v)
+          const str = bytesToUtf8OrNull(u8)
+          return str ?? summarizeBinary(u8.byteLength)
+        }
+        if (ArrayBuffer.isView(v)) {
+          const view = v as ArrayBufferView
+          const u8 = new Uint8Array(
+            view.buffer,
+            view.byteOffset,
+            view.byteLength,
+          )
+          const str = bytesToUtf8OrNull(u8)
+          return str ?? summarizeBinary(view.byteLength)
+        }
+        // Post-serialized Buffer shape ({type:'Buffer', data:[...]}).
+        const bufArr = asSerializedBuffer(v)
+        if (bufArr) {
+          const u8 = Uint8Array.from(bufArr)
+          const str = bytesToUtf8OrNull(u8)
+          return str ?? summarizeBinary(u8.byteLength)
         }
         if (v && typeof v === 'object') {
           if (seen.has(v as object)) return '[Circular]'
